@@ -25,6 +25,7 @@ import time
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import torch
@@ -74,7 +75,9 @@ WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
 # fix OMP: Error #15: Initializing libiomp5md.dll, but found libiomp5md.dll already initialized.
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictionary
+
+# hyp is path/to/hyp.yaml or hyp dictionary
+def train(hyp, opt, device, callbacks, augmentation_function: Callable | None = None):
     save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze = \
         Path(opt.save_dir), opt.epochs, opt.batch_size, opt.weights, opt.single_cls, opt.evolve, opt.data, opt.cfg, \
         opt.resume, opt.noval, opt.nosave, opt.workers, opt.freeze
@@ -220,7 +223,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                               quad=opt.quad,
                                               prefix=colorstr('train: '),
                                               shuffle=True,
-                                              seed=opt.seed)
+                                              seed=opt.seed,
+                                              augmentation_function=augmentation_function)
     labels = np.concatenate(dataset.labels, 0)
     mlc = int(labels[:, 0].max())  # max label class
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'

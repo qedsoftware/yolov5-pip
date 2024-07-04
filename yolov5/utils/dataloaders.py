@@ -16,6 +16,7 @@ from itertools import repeat
 from multiprocessing.pool import Pool, ThreadPool
 from pathlib import Path
 from threading import Thread
+from typing import Callable
 from urllib.parse import urlparse
 
 import numpy as np
@@ -116,7 +117,9 @@ def create_dataloader(path,
                       quad=False,
                       prefix='',
                       shuffle=False,
-                      seed=0):
+                      seed=0,
+                      augmentation_function: Callable | None = None
+                      ):
     if rect and shuffle:
         LOGGER.warning('WARNING ⚠️ --rect is incompatible with DataLoader shuffle, setting shuffle=False')
         shuffle = False
@@ -134,7 +137,8 @@ def create_dataloader(path,
             pad=pad,
             image_weights=image_weights,
             prefix=prefix,
-            workers=workers)
+            workers=workers,
+            augmentation_function=augmentation_function)
 
     batch_size = min(batch_size, len(dataset))
     nd = torch.cuda.device_count()  # number of CUDA devices
@@ -451,7 +455,8 @@ class LoadImagesAndLabels(Dataset):
                  pad=0.0,
                  min_items=0,
                  prefix='',
-                 workers=8):
+                 workers=8,
+                 augmentation_function: Callable | None = None):
         self.img_size = img_size
         self.augment = augment
         self.hyp = hyp
@@ -463,6 +468,7 @@ class LoadImagesAndLabels(Dataset):
         self.path = path
         self.albumentations = Albumentations(size=img_size) if augment else None
         self.workers = workers
+        self.augmentation_function = augmentation_function
 
         try:
             f = []  # image files
@@ -713,7 +719,10 @@ class LoadImagesAndLabels(Dataset):
 
         if self.augment:
             # Albumentations
-            img, labels = self.albumentations(img, labels)
+            if self.augmentation_function:
+                img, labels = self.augmentation_function(img, labels)
+            else:
+                img, labels = self.albumentations(img, labels)
             nl = len(labels)  # update after albumentations
 
             # HSV color-space
